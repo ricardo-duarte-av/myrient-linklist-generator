@@ -104,6 +104,7 @@ The script can be configured via command-line arguments:
 
 ## Safety Features
 
+- **No file downloads**: Only crawls directory listings, never downloads actual files
 - **Rate limiting**: Built-in delays prevent server overload
 - **Scope protection**: Never crawls outside the specified directory
 - **Error handling**: Graceful handling of network errors and timeouts

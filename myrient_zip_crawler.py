@@ -125,13 +125,20 @@ class MyrientZipCrawler:
             
             # Only include valid URLs
             if self.is_valid_url(absolute_url):
+                # If it's a ZIP file, add it to our collection immediately
+                if self.is_zip_file(absolute_url):
+                    with self.lock:
+                        self.zip_urls.add(absolute_url)
+                    logging.info(f"Found ZIP: {absolute_url}")
+                    continue
+                
                 # Skip files that are definitely not ZIP files
                 if self.should_skip_file(absolute_url):
                     logging.debug(f"Skipping non-ZIP file: {absolute_url}")
                     continue
                     
-                # Only add directories and ZIP files to the queue
-                if self.is_directory(absolute_url) or self.is_zip_file(absolute_url):
+                # Only add directories to the queue (we'll crawl them later)
+                if self.is_directory(absolute_url):
                     links.append(absolute_url)
                 
         return links
@@ -139,26 +146,23 @@ class MyrientZipCrawler:
     def crawl_url(self, url: str):
         """Crawl a single URL and extract links."""
         try:
+            # Only make HTTP requests to directories (URLs ending with /)
+            if not self.is_directory(url):
+                logging.debug(f"Skipping non-directory URL: {url}")
+                return
+            
             # Add delay to respect rate limits
             time.sleep(self.delay_between_requests + random.uniform(0, 0.2))
             
-            logging.info(f"Crawling: {url}")
+            logging.info(f"Crawling directory: {url}")
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
-            
-            # Check if this is a ZIP file
-            if self.is_zip_file(url):
-                with self.lock:
-                    self.zip_urls.add(url)
-                logging.info(f"Found ZIP: {url}")
-                return
             
             # Extract links from directory listing
             links = self.extract_links(response.text, url)
             
             # Log directory discovery
-            if self.is_directory(url):
-                logging.info(f"Gathering URLs from {url}")
+            logging.info(f"Gathering URLs from {url}")
             
             # Add new URLs to queue
             for link in links:
