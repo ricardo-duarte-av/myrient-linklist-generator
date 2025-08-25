@@ -16,6 +16,7 @@ from pathlib import Path
 import logging
 from typing import Set, List
 import random
+import argparse
 
 # Configure logging
 logging.basicConfig(
@@ -30,7 +31,8 @@ logging.basicConfig(
 class MyrientZipCrawler:
     def __init__(self, base_url: str = "https://myrient.erista.me/files/", 
                  max_threads: int = 5, 
-                 delay_between_requests: float = 0.5):
+                 delay_between_requests: float = 0.5,
+                 user_agent: str = None):
         self.base_url = base_url.rstrip('/')
         self.max_threads = max_threads
         self.delay_between_requests = delay_between_requests
@@ -43,8 +45,13 @@ class MyrientZipCrawler:
         
         # Session with browser-like headers
         self.session = requests.Session()
+        
+        # Set user agent (default or custom)
+        default_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        user_agent = user_agent or default_user_agent
+        
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': user_agent,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
             'Accept-Encoding': 'gzip, deflate',
@@ -80,6 +87,10 @@ class MyrientZipCrawler:
     def is_zip_file(self, url: str) -> bool:
         """Check if URL points to a ZIP file."""
         return url.lower().endswith('.zip')
+    
+    def is_directory(self, url: str) -> bool:
+        """Check if URL points to a directory (ends with /)."""
+        return url.endswith('/')
     
     def extract_links(self, html_content: str, current_url: str) -> List[str]:
         """Extract all links from HTML content."""
@@ -122,6 +133,10 @@ class MyrientZipCrawler:
             
             # Extract links from directory listing
             links = self.extract_links(response.text, url)
+            
+            # Log directory discovery
+            if self.is_directory(url):
+                logging.info(f"Gathering URLs from {url}")
             
             # Add new URLs to queue
             for link in links:
@@ -171,26 +186,98 @@ class MyrientZipCrawler:
         
         logging.info(f"Saved {len(self.zip_urls)} ZIP URLs to {output_file}")
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Crawl Myrient file repository to find ZIP files",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python myrient_zip_crawler.py
+  python myrient_zip_crawler.py --threads 3 --delay 1.0
+  python myrient_zip_crawler.py --user-agent "MyBot/1.0"
+        """
+    )
+    
+    parser.add_argument(
+        '--threads', '-t',
+        type=int,
+        default=5,
+        help='Number of concurrent threads (default: 5)'
+    )
+    
+    parser.add_argument(
+        '--delay', '-d',
+        type=float,
+        default=0.5,
+        help='Delay between requests in seconds (default: 0.5)'
+    )
+    
+    parser.add_argument(
+        '--user-agent', '-u',
+        type=str,
+        default=None,
+        help='Custom User-Agent string (default: Chrome browser)'
+    )
+    
+    parser.add_argument(
+        '--base-url', '-b',
+        type=str,
+        default="https://myrient.erista.me/files/",
+        help='Base URL to start crawling from (default: Myrient files directory)'
+    )
+    
+    parser.add_argument(
+        '--output', '-o',
+        type=str,
+        default="myrient_zip_links.txt",
+        help='Output file name (default: myrient_zip_links.txt)'
+    )
+    
+    return parser.parse_args()
+
 def main():
     """Main function."""
+    args = parse_arguments()
+    
+    # Validate arguments
+    if args.threads < 1:
+        print("Error: Number of threads must be at least 1")
+        return
+    
+    if args.delay < 0:
+        print("Error: Delay must be non-negative")
+        return
+    
+    print(f"Starting Myrient ZIP Crawler with:")
+    print(f"  Threads: {args.threads}")
+    print(f"  Delay: {args.delay}s")
+    print(f"  Base URL: {args.base_url}")
+    if args.user_agent:
+        print(f"  User-Agent: {args.user_agent}")
+    print()
+    
     crawler = MyrientZipCrawler(
-        base_url="https://myrient.erista.me/files/",
-        max_threads=5,  # Conservative threading
-        delay_between_requests=0.5  # 500ms delay between requests
+        base_url=args.base_url,
+        max_threads=args.threads,
+        delay_between_requests=args.delay,
+        user_agent=args.user_agent
     )
     
     try:
         crawler.crawl()
-        crawler.save_results()
+        crawler.save_results(args.output)
         
         print(f"\nCrawling completed successfully!")
         print(f"Found {len(crawler.zip_urls)} ZIP files")
-        print(f"Results saved to: myrient_zip_links.txt")
+        print(f"Results saved to: {args.output}")
         
     except KeyboardInterrupt:
         logging.info("Crawling interrupted by user")
+        print("\nCrawling interrupted by user")
     except Exception as e:
         logging.error(f"Crawling failed: {e}")
+        print(f"\nCrawling failed: {e}")
 
 if __name__ == "__main__":
     main()
