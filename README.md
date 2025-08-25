@@ -59,6 +59,9 @@ python myrient_zip_crawler.py --base-url "https://myrient.erista.me/files/No-Int
 
 # Combine multiple options
 python myrient_zip_crawler.py -t 4 -d 0.8 -o results.txt
+
+# Enable debug logging to see skipped files
+python myrient_zip_crawler.py --debug
 ```
 
 #### Available Options:
@@ -68,6 +71,7 @@ python myrient_zip_crawler.py -t 4 -d 0.8 -o results.txt
 - `--user-agent, -u`: Custom User-Agent string
 - `--base-url, -b`: Base URL to start crawling from
 - `--output, -o`: Output file name (default: myrient_zip_links.txt)
+- `--debug`: Enable debug logging to see skipped files
 
 ### Custom Configuration
 

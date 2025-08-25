@@ -92,6 +92,21 @@ class MyrientZipCrawler:
         """Check if URL points to a directory (ends with /)."""
         return url.endswith('/')
     
+    def should_skip_file(self, url: str) -> bool:
+        """Check if file should be skipped (common non-ZIP file types)."""
+        skip_extensions = [
+            '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm',  # Video files
+            '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a',          # Audio files
+            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', # Image files
+            '.pdf', '.doc', '.docx', '.txt', '.rtf',                  # Document files
+            '.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm',           # Executable files
+            '.iso', '.bin', '.cue', '.img',                           # Disk images
+            '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz',              # Other archives
+            '.json', '.xml', '.csv', '.sql', '.db', '.sqlite',        # Data files
+        ]
+        url_lower = url.lower()
+        return any(url_lower.endswith(ext) for ext in skip_extensions)
+    
     def extract_links(self, html_content: str, current_url: str) -> List[str]:
         """Extract all links from HTML content."""
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -110,7 +125,14 @@ class MyrientZipCrawler:
             
             # Only include valid URLs
             if self.is_valid_url(absolute_url):
-                links.append(absolute_url)
+                # Skip files that are definitely not ZIP files
+                if self.should_skip_file(absolute_url):
+                    logging.debug(f"Skipping non-ZIP file: {absolute_url}")
+                    continue
+                    
+                # Only add directories and ZIP files to the queue
+                if self.is_directory(absolute_url) or self.is_zip_file(absolute_url):
+                    links.append(absolute_url)
                 
         return links
     
@@ -234,11 +256,21 @@ Examples:
         help='Output file name (default: myrient_zip_links.txt)'
     )
     
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug logging to see skipped files'
+    )
+    
     return parser.parse_args()
 
 def main():
     """Main function."""
     args = parse_arguments()
+    
+    # Set debug logging if requested
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
     
     # Validate arguments
     if args.threads < 1:
