@@ -1,0 +1,12 @@
+2025-08-25 23:39:34,931 - INFO - Starting crawl of https://myrient.erista.me/files/
+2025-08-25 23:39:34,931 - INFO - Using 1 threads with 0.1s delay
+2025-08-25 23:39:35,063 - INFO - Crawling directory: https://myrient.erista.me/files/
+2025-08-25 23:39:35,065 - DEBUG - Starting new HTTPS connection (1): myrient.erista.me:443
+2025-08-25 23:39:52,648 - ERROR - Error crawling https://myrient.erista.me/files/: HTTPSConnectionPool(host='myrient.erista.me', port=443): Max retries exceeded with url: /files/ (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x0000029E2012BA30>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2025-08-25 23:39:57,650 - INFO - Crawling completed. Found 0 ZIP files.
+2025-08-25 23:39:57,650 - INFO - Saved 0 ZIP URLs to myrient_zip_links.txt
+2025-08-25 23:41:37,165 - INFO - Found ZIP: https://myrient.erista.me/files/example.zip
+2025-08-25 23:44:50,814 - INFO - Found target file: https://myrient.erista.me/files/example.zip
+2025-08-25 23:44:50,814 - INFO - Found target file: https://myrient.erista.me/files/archive.7z
+2025-08-25 23:44:57,551 - INFO - Found target file: https://myrient.erista.me/files/example.zip
+2025-08-25 23:44:57,553 - INFO - Found target file: https://myrient.erista.me/files/archive.7z

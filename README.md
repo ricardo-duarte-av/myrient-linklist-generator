@@ -1,11 +1,11 @@
-# Myrient ZIP File Crawler
+# Myrient File Crawler
 
-A Python script to crawl the [Myrient file repository](https://myrient.erista.me/files/) and extract all ZIP file URLs. The script uses threading for speed while respecting rate limits to avoid overwhelming the server.
+A Python script to crawl the [Myrient file repository](https://myrient.erista.me/files/) and extract URLs for specified file types. The script uses threading for speed while respecting rate limits to avoid overwhelming the server.
 
 ## Features
 
 - **Recursive crawling**: Explores all subdirectories within the specified base URL
-- **ZIP file detection**: Identifies and collects all ZIP file URLs
+- **Multi-file type support**: Identifies and collects URLs for specified file types (ZIP, 7z, etc.)
 - **Threading support**: Uses multiple threads for faster crawling
 - **Rate limiting**: Configurable delays to respect server limits
 - **Browser-like headers**: Mimics real browser requests
@@ -37,6 +37,7 @@ python myrient_zip_crawler.py
 This will:
 - Crawl `https://myrient.erista.me/files/` and all subdirectories
 - Use 5 threads with 500ms delay between requests
+- Find ZIP files by default
 - Save results to `myrient_zip_links.txt`
 - Log progress to `crawler.log`
 
@@ -51,6 +52,9 @@ python myrient_zip_crawler.py --threads 3 --delay 1.0
 # Use custom user agent
 python myrient_zip_crawler.py --user-agent "MyBot/1.0"
 
+# Find multiple file types
+python myrient_zip_crawler.py --filetypes "zip,7z,rar"
+
 # Specify custom output file
 python myrient_zip_crawler.py --output my_zip_links.txt
 
@@ -58,7 +62,7 @@ python myrient_zip_crawler.py --output my_zip_links.txt
 python myrient_zip_crawler.py --base-url "https://myrient.erista.me/files/No-Intro/"
 
 # Combine multiple options
-python myrient_zip_crawler.py -t 4 -d 0.8 -o results.txt
+python myrient_zip_crawler.py -t 4 -d 0.8 -f "zip,7z" -o results.txt
 
 # Enable debug logging to see skipped files
 python myrient_zip_crawler.py --debug
@@ -68,6 +72,7 @@ python myrient_zip_crawler.py --debug
 
 - `--threads, -t`: Number of concurrent threads (default: 5)
 - `--delay, -d`: Delay between requests in seconds (default: 0.5)
+- `--filetypes, -f`: Comma-separated list of file extensions to find (default: zip)
 - `--user-agent, -u`: Custom User-Agent string
 - `--base-url, -b`: Base URL to start crawling from
 - `--output, -o`: Output file name (default: myrient_zip_links.txt)
@@ -89,7 +94,7 @@ crawler = MyrientZipCrawler(
 
 The script generates two files:
 
-1. **`myrient_zip_links.txt`**: Contains all found ZIP file URLs, one per line
+1. **`myrient_zip_links.txt`**: Contains all found target file URLs, one per line
 2. **`crawler.log`**: Detailed logging of the crawling process
 
 ## Configuration Options
@@ -98,6 +103,7 @@ The script can be configured via command-line arguments:
 
 - **`--threads, -t`**: Number of concurrent threads (default: 5)
 - **`--delay, -d`**: Delay between requests in seconds (default: 0.5)
+- **`--filetypes, -f`**: Comma-separated list of file extensions to find (default: zip)
 - **`--user-agent, -u`**: Custom User-Agent string
 - **`--base-url, -b`**: Starting URL for crawling (default: Myrient files directory)
 - **`--output, -o`**: Output file name (default: myrient_zip_links.txt)
@@ -116,13 +122,13 @@ The script can be configured via command-line arguments:
 ```
 2024-01-15 10:30:15 - INFO - Starting crawl of https://myrient.erista.me/files/
 2024-01-15 10:30:15 - INFO - Using 5 threads with 0.5s delay
-2024-01-15 10:30:16 - INFO - Crawling: https://myrient.erista.me/files/
+2024-01-15 10:30:16 - INFO - Crawling directory: https://myrient.erista.me/files/
 2024-01-15 10:30:17 - INFO - Gathering URLs from https://myrient.erista.me/files/No-Intro/
-2024-01-15 10:30:18 - INFO - Found ZIP: https://myrient.erista.me/files/No-Intro/example.zip
+2024-01-15 10:30:18 - INFO - Found target file: https://myrient.erista.me/files/No-Intro/example.zip
 2024-01-15 10:30:19 - INFO - Gathering URLs from https://myrient.erista.me/files/Redump/
 ...
-2024-01-15 10:35:20 - INFO - Crawling completed. Found 1250 ZIP files.
-2024-01-15 10:35:20 - INFO - Saved 1250 ZIP URLs to myrient_zip_links.txt
+2024-01-15 10:35:20 - INFO - Crawling completed. Found 1250 target files.
+2024-01-15 10:35:20 - INFO - Saved 1250 target file URLs to myrient_zip_links.txt
 ```
 
 ## Notes

@@ -32,10 +32,15 @@ class MyrientZipCrawler:
     def __init__(self, base_url: str = "https://myrient.erista.me/files/", 
                  max_threads: int = 5, 
                  delay_between_requests: float = 0.5,
-                 user_agent: str = None):
-        self.base_url = base_url.rstrip('/')
+                 user_agent: str = None,
+                 file_types: str = "zip"):
+        # Ensure base_url ends with / for directory crawling
+        self.base_url = base_url.rstrip('/') + '/'
         self.max_threads = max_threads
         self.delay_between_requests = delay_between_requests
+        
+        # Parse file types (comma-separated, no dots)
+        self.file_types = [f".{ext.strip().lower()}" for ext in file_types.split(',')]
         
         # Thread-safe collections
         self.visited_urls: Set[str] = set()
@@ -71,29 +76,38 @@ class MyrientZipCrawler:
         if parsed_url.netloc != parsed_base.netloc:
             return False
             
+        # Normalize paths for comparison (remove trailing slashes)
+        base_path = parsed_base.path.rstrip('/')
+        url_path = parsed_url.path.rstrip('/')
+        
         # Must be under the base path
-        if not parsed_url.path.startswith(parsed_base.path):
+        if not url_path.startswith(base_path):
             return False
             
         # Must not go higher than base directory
-        base_path_parts = parsed_base.path.strip('/').split('/')
-        url_path_parts = parsed_url.path.strip('/').split('/')
+        base_path_parts = base_path.split('/') if base_path else []
+        url_path_parts = url_path.split('/') if url_path else []
         
         if len(url_path_parts) < len(base_path_parts):
             return False
             
         return True
     
-    def is_zip_file(self, url: str) -> bool:
-        """Check if URL points to a ZIP file."""
-        return url.lower().endswith('.zip')
+    def is_target_file(self, url: str) -> bool:
+        """Check if URL points to a target file type."""
+        url_lower = url.lower()
+        return any(url_lower.endswith(ext) for ext in self.file_types)
     
     def is_directory(self, url: str) -> bool:
         """Check if URL points to a directory (ends with /)."""
         return url.endswith('/')
     
     def should_skip_file(self, url: str) -> bool:
-        """Check if file should be skipped (common non-ZIP file types)."""
+        """Check if file should be skipped (common non-target file types)."""
+        # Don't skip files that match our target types
+        if self.is_target_file(url):
+            return False
+            
         skip_extensions = [
             '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm',  # Video files
             '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a',          # Audio files
@@ -101,7 +115,6 @@ class MyrientZipCrawler:
             '.pdf', '.doc', '.docx', '.txt', '.rtf',                  # Document files
             '.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm',           # Executable files
             '.iso', '.bin', '.cue', '.img',                           # Disk images
-            '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz',              # Other archives
             '.json', '.xml', '.csv', '.sql', '.db', '.sqlite',        # Data files
         ]
         url_lower = url.lower()
@@ -123,23 +136,29 @@ class MyrientZipCrawler:
             # Convert relative URLs to absolute
             absolute_url = urljoin(current_url, href)
             
+            # Debug logging for URL processing
+            logging.debug(f"Processing link: {href} -> {absolute_url}")
+            
             # Only include valid URLs
             if self.is_valid_url(absolute_url):
-                # If it's a ZIP file, add it to our collection immediately
-                if self.is_zip_file(absolute_url):
+                # If it's a target file, add it to our collection immediately
+                if self.is_target_file(absolute_url):
                     with self.lock:
                         self.zip_urls.add(absolute_url)
-                    logging.info(f"Found ZIP: {absolute_url}")
+                    logging.info(f"Found target file: {absolute_url}")
                     continue
                 
-                # Skip files that are definitely not ZIP files
+                # Skip files that are definitely not target files
                 if self.should_skip_file(absolute_url):
-                    logging.debug(f"Skipping non-ZIP file: {absolute_url}")
+                    logging.debug(f"Skipping non-target file: {absolute_url}")
                     continue
                     
                 # Only add directories to the queue (we'll crawl them later)
                 if self.is_directory(absolute_url):
                     links.append(absolute_url)
+                    logging.debug(f"Added directory to queue: {absolute_url}")
+            else:
+                logging.debug(f"Invalid URL (outside scope): {absolute_url}")
                 
         return links
     
@@ -155,8 +174,13 @@ class MyrientZipCrawler:
             time.sleep(self.delay_between_requests + random.uniform(0, 0.2))
             
             logging.info(f"Crawling directory: {url}")
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=30, allow_redirects=True)
             response.raise_for_status()
+            
+            # Log response info for debugging
+            logging.debug(f"Response status: {response.status_code}")
+            logging.debug(f"Response URL: {response.url}")
+            logging.debug(f"Content length: {len(response.text)}")
             
             # Extract links from directory listing
             links = self.extract_links(response.text, url)
@@ -202,7 +226,7 @@ class MyrientZipCrawler:
         for thread in threads:
             thread.join()
         
-        logging.info(f"Crawling completed. Found {len(self.zip_urls)} ZIP files.")
+        logging.info(f"Crawling completed. Found {len(self.zip_urls)} target files.")
     
     def save_results(self, output_file: str = "myrient_zip_links.txt"):
         """Save ZIP URLs to a text file."""
@@ -210,17 +234,18 @@ class MyrientZipCrawler:
             for url in sorted(self.zip_urls):
                 f.write(f"{url}\n")
         
-        logging.info(f"Saved {len(self.zip_urls)} ZIP URLs to {output_file}")
+        logging.info(f"Saved {len(self.zip_urls)} target file URLs to {output_file}")
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Crawl Myrient file repository to find ZIP files",
+        description="Crawl Myrient file repository to find specified file types",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python myrient_zip_crawler.py
   python myrient_zip_crawler.py --threads 3 --delay 1.0
+  python myrient_zip_crawler.py --filetypes "zip,7z,rar"
   python myrient_zip_crawler.py --user-agent "MyBot/1.0"
         """
     )
@@ -261,6 +286,13 @@ Examples:
     )
     
     parser.add_argument(
+        '--filetypes', '-f',
+        type=str,
+        default="zip",
+        help='Comma-separated list of file extensions to find (default: zip)'
+    )
+    
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging to see skipped files'
@@ -285,10 +317,11 @@ def main():
         print("Error: Delay must be non-negative")
         return
     
-    print(f"Starting Myrient ZIP Crawler with:")
+    print(f"Starting Myrient File Crawler with:")
     print(f"  Threads: {args.threads}")
     print(f"  Delay: {args.delay}s")
     print(f"  Base URL: {args.base_url}")
+    print(f"  File types: {args.filetypes}")
     if args.user_agent:
         print(f"  User-Agent: {args.user_agent}")
     print()
@@ -297,7 +330,8 @@ def main():
         base_url=args.base_url,
         max_threads=args.threads,
         delay_between_requests=args.delay,
-        user_agent=args.user_agent
+        user_agent=args.user_agent,
+        file_types=args.filetypes
     )
     
     try:
@@ -305,7 +339,7 @@ def main():
         crawler.save_results(args.output)
         
         print(f"\nCrawling completed successfully!")
-        print(f"Found {len(crawler.zip_urls)} ZIP files")
+        print(f"Found {len(crawler.zip_urls)} target files")
         print(f"Results saved to: {args.output}")
         
     except KeyboardInterrupt:
